@@ -22,6 +22,7 @@ npx stdio-to-ws "npx @google/gemini-cli --experimental-acp" --port 3000
 -g, --grace-period <seconds>   Time in seconds before killing disconnected process (default: 30, -1 for infinite)
 --tunnel                       Expose the server via a Dev Tunnel (auto-creates a wss:// URL)
 --tunnel-name <name>           Use a named Dev Tunnel (reusable across restarts, implies --tunnel)
+--ping <ms>                    Send WebSocket ping frames every <ms> milliseconds (default: 0, disabled)
 -q, --quiet                    Suppress logging output
 -h, --help                     Show help message
 ```

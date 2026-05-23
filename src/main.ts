@@ -6,7 +6,7 @@ import { startTunnelHost } from "./tunnel-host.js";
 
 const argv = minimist(process.argv.slice(2), {
   alias: { p: "port", h: "help", q: "quiet", g: "grace-period" },
-  default: { port: 3000, "grace-period": "30" },
+  default: { port: 3000, "grace-period": "30", ping: 0 },
   boolean: ["quiet", "persist", "1", "tunnel"],  // Treat -1 as a boolean so we can detect it
   string: ["grace-period", "tunnel-name"],
 });
@@ -20,6 +20,7 @@ Options:
   -q, --quiet                    Suppress logging output
   --tunnel                       Expose the WebSocket server via a Dev Tunnel (auto-creates wss:// URL)
   --tunnel-name <name>           Use a named tunnel (reusable across restarts, implies --tunnel)
+  --ping <ms>                    Send WebSocket ping frames every <ms> milliseconds (default: 0, disabled)
   -h, --help                     Show this help message
 
 Example:
@@ -59,12 +60,18 @@ if (argv["1"] === true || argv["grace-period"] === "-1") {
   gracePeriodMs = gracePeriodSeconds * 1000;
 }
 
+if (typeof argv.ping !== "number" || argv.ping < 0) {
+  console.error(`Invalid ping interval: ${argv.ping}`);
+  process.exit(1);
+}
+
 void startWebSocketServer({
   command: parseArgsStringToArgv(cmd),
   port: argv.port,
   quiet: argv.quiet,
   persist: argv.persist,
   gracePeriodMs,
+  pingIntervalMs: argv.ping,
 });
 
 // Start tunnel host if --tunnel or --tunnel-name is provided

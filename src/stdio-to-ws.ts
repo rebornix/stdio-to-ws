@@ -52,12 +52,17 @@ function cleanupClient(clientId: string): void {
 function handleWebSocketConnection(
   command: string[],
   webSocket: WebSocket,
-  options: { persist: boolean; gracePeriodMs: number; clientId?: string },
+  options: { persist: boolean; gracePeriodMs: number; pingIntervalMs: number; clientId?: string },
 ): void {
-  const { persist, gracePeriodMs, clientId: requestedId } = options;
+  const { persist, gracePeriodMs, pingIntervalMs, clientId: requestedId } = options;
 
   // -1 means infinite grace period (no cleanup)
   const isInfinite = gracePeriodMs === -1;
+
+  let pingTimer: NodeJS.Timeout | null = null;
+  if (pingIntervalMs) {
+    pingTimer = setInterval(() => webSocket.ping(), pingIntervalMs);
+  }
 
   // Check if reconnecting to existing client
   if (persist && requestedId && clients.has(requestedId)) {
@@ -94,6 +99,9 @@ function handleWebSocketConnection(
 
     webSocket.on("close", () => {
       log(`WebSocket closed for client ${client.id}${isInfinite ? " (infinite persistence)" : ", starting grace period"}`);
+      if (pingTimer) {
+        clearInterval(pingTimer);
+      }
       if (!isInfinite) {
         client.cleanupTimer = setTimeout(() => {
           cleanupClient(client.id);
@@ -142,6 +150,9 @@ function handleWebSocketConnection(
     if (persist) {
       const isInfinite = gracePeriodMs === -1;
       log(`WebSocket closed for client ${clientId}${isInfinite ? " (infinite persistence)" : ", starting grace period"}`);
+      if (pingTimer) {
+        clearInterval(pingTimer);
+      }
       if (!isInfinite) {
         client.cleanupTimer = setTimeout(() => {
           cleanupClient(clientId);
@@ -179,8 +190,9 @@ export function startWebSocketServer(opts: {
   quiet?: boolean;
   persist?: boolean;
   gracePeriodMs?: number;
+  pingIntervalMs?: number;
 }): void {
-  const { port, command, corsOrigin, quiet = false, persist = false, gracePeriodMs = 30000 } = opts;
+  const { port, command, corsOrigin, quiet = false, persist = false, gracePeriodMs = 30000, pingIntervalMs = 0 } = opts;
   isQuiet = quiet;
 
   const wss = new WebSocketServer({
@@ -202,7 +214,7 @@ export function startWebSocketServer(opts: {
   wss.on("connection", (webSocket, request) => {
     const clientId = request.headers["x-client-id"] as string | undefined;
     log("New WebSocket connection", clientId ? `(X-Client-Id: ${clientId})` : "(no X-Client-Id header)");
-    handleWebSocketConnection(command, webSocket, { persist, gracePeriodMs, clientId });
+    handleWebSocketConnection(command, webSocket, { persist, gracePeriodMs, pingIntervalMs, clientId });
   });
 
   const graceDisplay = gracePeriodMs === -1 ? "infinite" : `${gracePeriodMs / 1000}s`;
